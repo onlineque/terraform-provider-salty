@@ -171,7 +171,7 @@ func (r *GrainResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	}
 
 	tflog.Info(ctx, "readGrain, raw JSON:")
-	tflog.Info(ctx, string(readGrain))
+	tflog.Info(ctx, readGrain)
 
 	liveGrains := SaltGrainModel{}
 	_ = json.Unmarshal([]byte(readGrain), &liveGrains)
@@ -234,7 +234,7 @@ func (r *GrainResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 
 	tflog.Info(ctx, "readGrain, raw JSON:")
-	tflog.Info(ctx, string(readGrain))
+	tflog.Info(ctx, readGrain)
 
 	liveGrains := SaltGrainModel{}
 	err = json.Unmarshal([]byte(readGrain), &liveGrains)
@@ -269,7 +269,7 @@ func (r *GrainResource) Update(ctx context.Context, req resource.UpdateRequest, 
 					fmt.Sprintf("cannot append the grain value on theSalt Minion %s: %s", data.Server.ValueString(), err),
 				)
 			}
-			tflog.Info(ctx, string(appendGrain))
+			tflog.Info(ctx, appendGrain)
 			if resp.Diagnostics.HasError() {
 				return
 			}
@@ -320,7 +320,7 @@ func (r *GrainResource) Update(ctx context.Context, req resource.UpdateRequest, 
 					fmt.Sprintf("cannot delete the grain value on theSalt Minion %s: %s", data.Server.ValueString(), err),
 				)
 			}
-			tflog.Info(ctx, string(appendGrain))
+			tflog.Info(ctx, appendGrain)
 			if resp.Diagnostics.HasError() {
 				return
 			}
