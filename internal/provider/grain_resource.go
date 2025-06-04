@@ -249,11 +249,22 @@ func (r *GrainResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	tflog.Info(ctx, fmt.Sprintf("%v", liveGrains.Roles))
 	tflog.Info(ctx, "===============")
 
+	var grainValueStr types.String
+	var ok bool
+
 	for _, grainValue := range data.GrainValue.Elements() {
+		if grainValueStr, ok = grainValue.(types.String); !ok {
+			resp.Diagnostics.AddError(
+				"cannot convert grain to String, type conversion failed",
+				fmt.Sprintf("cannot convert grain to String, type conversion failed: %s", err),
+			)
+			return
+		}
+
 		isFound := false
 		for _, stateGrainValue := range liveGrains.Roles {
-			tflog.Info(ctx, fmt.Sprintf("COMPARING: %s and %s", grainValue.(types.String).ValueString(), stateGrainValue))
-			if grainValue.(types.String).ValueString() == stateGrainValue {
+			tflog.Info(ctx, fmt.Sprintf("COMPARING: %s and %s", grainValueStr.ValueString(), stateGrainValue))
+			if grainValueStr.ValueString() == stateGrainValue {
 				isFound = true
 			}
 		}
