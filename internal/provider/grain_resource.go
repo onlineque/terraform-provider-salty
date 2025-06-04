@@ -393,7 +393,7 @@ func (r *GrainResource) ImportState(ctx context.Context, req resource.ImportStat
 }
 
 func (r *GrainResource) applyState(ctx context.Context, data GrainResourceModel) error {
-	runCommand := fmt.Sprintf("/usr/lib/venv-salt-minion/bin/salt-call state.apply")
+	runCommand := "/usr/lib/venv-salt-minion/bin/salt-call state.apply"
 	_, err := r.runRemoteCommand(runCommand, ctx, data)
 	if err != nil {
 		return fmt.Errorf("cannot apply state: %s", err.Error())
@@ -426,9 +426,8 @@ func (r *GrainResource) runRemoteCommand(runCommand string, ctx context.Context,
 		return "", fmt.Errorf("cannot create session with the Salt Minion %s: %s", data.Server.ValueString(), err)
 	}
 
-	command := fmt.Sprintf(runCommand)
-	tflog.Info(ctx, command)
-	cmdOutput, err := session.Output(command)
+	tflog.Info(ctx, runCommand)
+	cmdOutput, err := session.Output(runCommand)
 	tflog.Info(ctx, string(cmdOutput))
 
 	if err != nil {
