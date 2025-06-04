@@ -315,7 +315,7 @@ func (r *GrainResource) Update(ctx context.Context, req resource.UpdateRequest, 
 			tflog.Info(ctx, stateGrainValue)
 			tflog.Info(ctx, grainValue.String())
 
-			if stateGrainValue == grainValue.(types.String).ValueString() {
+			if stateGrainValue == grainValueStr.ValueString() {
 				isFound = true
 			}
 		}
