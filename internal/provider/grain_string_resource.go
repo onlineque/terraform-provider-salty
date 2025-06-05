@@ -255,12 +255,13 @@ func (r *GrainStringResource) Delete(ctx context.Context, req resource.DeleteReq
 	tflog.Info(ctx, data.GrainKey.String())
 	tflog.Info(ctx, data.GrainValue.String())
 
-	runCommand := fmt.Sprintf("/usr/lib/venv-salt-minion/bin/salt-call grains.remove %s %s --out=json", data.GrainKey.String(), data.GrainValue.String())
+	runCommand := fmt.Sprintf("/usr/lib/venv-salt-minion/bin/salt-call grains.delkey %s --out=json", data.GrainKey.String())
 	_, err := r.runRemoteCommand(runCommand, ctx, data)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			err.Error(),
 			err.Error())
+		return
 	}
 
 	if data.ApplyState.ValueBool() {

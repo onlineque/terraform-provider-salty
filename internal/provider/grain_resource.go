@@ -392,6 +392,9 @@ func (r *GrainResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 				err.Error(),
 				err.Error())
 		}
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	if data.ApplyState.ValueBool() {
