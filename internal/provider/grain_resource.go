@@ -121,7 +121,7 @@ func (r *GrainResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	// For the purposes of this example code, hardcoding a response value to
 	// save into the Terraform state.
-	data.Id = types.StringValue("example-id")
+	data.Id = types.StringValue(fmt.Sprintf("%s-%s", data.Server.ValueString(), data.GrainKey.String()))
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
@@ -198,7 +198,7 @@ func (r *GrainResource) Read(ctx context.Context, req resource.ReadRequest, resp
 
 	data.GrainValue = listVal
 
-	data.Id = types.StringValue("example-id")
+	data.Id = types.StringValue(fmt.Sprintf("%s-%s", data.Server.ValueString(), data.GrainKey.String()))
 
 	tflog.Info(ctx, "read a resource")
 	b, _ := json.MarshalIndent(data, "", "    ")
@@ -350,7 +350,7 @@ func (r *GrainResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		}
 	}
 
-	data.Id = types.StringValue("example-id")
+	data.Id = types.StringValue(fmt.Sprintf("%s-%s", data.Server.ValueString(), data.GrainKey.String()))
 
 	diags := resp.State.Set(ctx, &data)
 	resp.Diagnostics.Append(diags...)
