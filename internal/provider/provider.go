@@ -126,5 +126,6 @@ func (p *saltyProvider) DataSources(_ context.Context) []func() datasource.DataS
 func (p *saltyProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewGrainResource,
+		NewGrainStringResource,
 	}
 }
