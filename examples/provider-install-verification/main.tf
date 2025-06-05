@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     salty = {
-      source  = "github.com/onlineque/salty"
+      source  = "onlineque/salty"
       version = "0.1.0"
     }
   }
