@@ -121,7 +121,7 @@ func (r *GrainResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	// For the purposes of this example code, hardcoding a response value to
 	// save into the Terraform state.
-	data.Id = types.StringValue(fmt.Sprintf("%s-%s", data.Server.ValueString(), data.GrainKey.String()))
+	data.Id = types.StringValue(fmt.Sprintf("%s-%s", data.Server.ValueString(), data.GrainKey.ValueString()))
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
@@ -198,7 +198,7 @@ func (r *GrainResource) Read(ctx context.Context, req resource.ReadRequest, resp
 
 	data.GrainValue = listVal
 
-	data.Id = types.StringValue(fmt.Sprintf("%s-%s", data.Server.ValueString(), data.GrainKey.String()))
+	data.Id = types.StringValue(fmt.Sprintf("%s-%s", data.Server.ValueString(), data.GrainKey.ValueString()))
 
 	tflog.Info(ctx, "read a resource")
 	b, _ := json.MarshalIndent(data, "", "    ")
@@ -311,6 +311,14 @@ func (r *GrainResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	for _, stateGrainValue := range liveGrains.Roles {
 		isFound := false
 		for _, grainValue := range data.GrainValue.Elements() {
+			if grainValueStr, ok = grainValue.(types.String); !ok {
+				resp.Diagnostics.AddError(
+					"cannot convert grain to String, type conversion failed",
+					fmt.Sprintf("cannot convert grain to String, type conversion failed: %s", err),
+				)
+				return
+			}
+
 			tflog.Info(ctx, "hodnoty pro porovnavani:")
 			tflog.Info(ctx, stateGrainValue)
 			tflog.Info(ctx, grainValue.String())
@@ -350,7 +358,7 @@ func (r *GrainResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		}
 	}
 
-	data.Id = types.StringValue(fmt.Sprintf("%s-%s", data.Server.ValueString(), data.GrainKey.String()))
+	data.Id = types.StringValue(fmt.Sprintf("%s-%s", data.Server.ValueString(), data.GrainKey.ValueString()))
 
 	diags := resp.State.Set(ctx, &data)
 	resp.Diagnostics.Append(diags...)
