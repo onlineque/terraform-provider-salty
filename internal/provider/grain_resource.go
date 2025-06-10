@@ -105,6 +105,15 @@ func (r *GrainResource) Create(ctx context.Context, req resource.CreateRequest, 
 		return
 	}
 
+	err := r.waitMinionIsUp(ctx, data)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"failed to wait for the minion to be up",
+			fmt.Sprintf("failed to wait for the minion %s to be up: %s", data.Server.ValueString(), err),
+		)
+		return
+	}
+
 	for _, value := range data.GrainValue.Elements() {
 		runCommand := fmt.Sprintf("/usr/lib/venv-salt-minion/bin/salt-call grains.append %s %s", data.GrainKey.String(), value.String())
 		_, err := r.runRemoteCommand(runCommand, ctx, data)
@@ -155,6 +164,15 @@ func (r *GrainResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	resp.Diagnostics.Append(diags...)
 
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	err := r.waitMinionIsUp(ctx, data)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"failed to wait for the minion to be up",
+			fmt.Sprintf("failed to wait for the minion %s to be up: %s", data.Server.ValueString(), err),
+		)
 		return
 	}
 
@@ -218,6 +236,15 @@ func (r *GrainResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	err := r.waitMinionIsUp(ctx, data)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"failed to wait for the minion to be up",
+			fmt.Sprintf("failed to wait for the minion %s to be up: %s", data.Server.ValueString(), err),
+		)
 		return
 	}
 
@@ -378,6 +405,15 @@ func (r *GrainResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		return
 	}
 
+	err := r.waitMinionIsUp(ctx, data)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"failed to wait for the minion to be up",
+			fmt.Sprintf("failed to wait for the minion %s to be up: %s", data.Server.ValueString(), err),
+		)
+		return
+	}
+
 	tflog.Info(ctx, "DELETE - Data from the state: ")
 	tflog.Info(ctx, data.Server.String())
 	tflog.Info(ctx, data.Id.String())
@@ -421,6 +457,15 @@ func (r *GrainResource) applyState(ctx context.Context, data GrainResourceModel)
 		return fmt.Errorf("cannot apply state: %s", err.Error())
 	}
 
+	return nil
+}
+
+func (r *GrainResource) waitMinionIsUp(ctx context.Context, data GrainResourceModel) error {
+	runCommand := "while [ ! -f /etc/venv-salt-minion/pki/minion ]; do sleep 1; done"
+	_, err := r.runRemoteCommand(runCommand, ctx, data)
+	if err != nil {
+		return fmt.Errorf("failed to wait for the minion to be up: %s", err.Error())
+	}
 	return nil
 }
 
