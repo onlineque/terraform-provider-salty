@@ -461,7 +461,7 @@ func (r *GrainResource) applyState(ctx context.Context, data GrainResourceModel)
 }
 
 func (r *GrainResource) waitMinionIsUp(ctx context.Context, data GrainResourceModel) error {
-	runCommand := "while [ ! -f /etc/venv-salt-minion/pki/minion ]; do sleep 1; done"
+	runCommand := "while [ ! -f /etc/venv-salt-minion/pki/minion/minion_master.pub ]; do sleep 1; done"
 	_, err := r.runRemoteCommand(runCommand, ctx, data)
 	if err != nil {
 		return fmt.Errorf("failed to wait for the minion to be up: %s", err.Error())
