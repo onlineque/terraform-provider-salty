@@ -19,3 +19,6 @@ description: |-
 
 - `private_key` (String, Sensitive)
 - `username` (String)
+- `uyuni_base_url` (String)
+- `uyuni_password` (String, Sensitive)
+- `uyuni_username` (String)
