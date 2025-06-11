@@ -4,7 +4,9 @@
 package provider
 
 import (
+	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -14,6 +16,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"golang.org/x/crypto/ssh"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"strings"
+	"time"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -26,8 +33,11 @@ func NewGrainResource() resource.Resource {
 
 // GrainResource defines the resource implementation.
 type GrainResource struct {
-	username   *string
-	privateKey *string
+	username      *string
+	privateKey    *string
+	uyuniBaseURL  *string
+	uyuniUsername *string
+	uyuniPassword *string
 }
 
 // GrainResourceModel describes the resource data model.
@@ -93,6 +103,9 @@ func (r *GrainResource) Configure(ctx context.Context, req resource.ConfigureReq
 
 	r.username = &data.Username
 	r.privateKey = &data.PrivateKey
+	r.uyuniBaseURL = &data.UyuniBaseURL
+	r.uyuniUsername = &data.UyuniUsername
+	r.uyuniPassword = &data.UyuniPassword
 }
 
 func (r *GrainResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -105,7 +118,7 @@ func (r *GrainResource) Create(ctx context.Context, req resource.CreateRequest, 
 		return
 	}
 
-	err := r.waitMinionIsUp(ctx, data)
+	err := r.waitMinionIsUp(data)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"failed to wait for the minion to be up",
@@ -167,7 +180,7 @@ func (r *GrainResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	err := r.waitMinionIsUp(ctx, data)
+	err := r.waitMinionIsUp(data)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"failed to wait for the minion to be up",
@@ -239,7 +252,7 @@ func (r *GrainResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	err := r.waitMinionIsUp(ctx, data)
+	err := r.waitMinionIsUp(data)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"failed to wait for the minion to be up",
@@ -405,7 +418,7 @@ func (r *GrainResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		return
 	}
 
-	err := r.waitMinionIsUp(ctx, data)
+	err := r.waitMinionIsUp(data)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"failed to wait for the minion to be up",
@@ -460,13 +473,31 @@ func (r *GrainResource) applyState(ctx context.Context, data GrainResourceModel)
 	return nil
 }
 
-func (r *GrainResource) waitMinionIsUp(ctx context.Context, data GrainResourceModel) error {
-	runCommand := "while [ ! -f /etc/venv-salt-minion/pki/minion/minion_master.pub ]; do sleep 1; done"
-	_, err := r.runRemoteCommand(runCommand, ctx, data)
-	if err != nil {
-		return fmt.Errorf("failed to wait for the minion to be up: %s", err.Error())
+func (r *GrainResource) waitMinionIsUp(data GrainResourceModel) error {
+	timeout := 30 * time.Minute
+	deadline := time.Now().Add(timeout)
+
+	for {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout reached after %d minutes; salt-key for %s not accepted", timeout, data.Server.ValueString())
+		}
+
+		found, err := CheckServerAccepted(*r.uyuniBaseURL, *r.uyuniUsername, *r.uyuniPassword, data.Server.ValueString())
+		if err != nil {
+			return fmt.Errorf("error checking salt-key acceptance of %s: %s", data.Server.ValueString(), err)
+		}
+		if found {
+			return nil
+		}
+		time.Sleep(10 * time.Second)
 	}
-	return nil
+
+	// runCommand := "while [ ! -f /etc/venv-salt-minion/pki/minion/minion_master.pub ]; do sleep 1; done"
+	// _, err := r.runRemoteCommand(runCommand, ctx, data)
+	// if err != nil {
+	// 		return fmt.Errorf("failed to wait for the minion to be up: %s", err.Error())
+	// }
+	// return nil
 }
 
 func (r *GrainResource) runRemoteCommand(runCommand string, ctx context.Context, data GrainResourceModel) (string, error) {
@@ -502,4 +533,84 @@ func (r *GrainResource) runRemoteCommand(runCommand string, ctx context.Context,
 	}
 
 	return string(cmdOutput), nil
+}
+
+// CheckServerAccepted logs in and checks if a server is in the accepted list.
+func CheckServerAccepted(baseURL, username, password, serverName string) (bool, error) {
+	// Create HTTP client with cookie jar
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to create cookie jar: %w", err)
+	}
+	client := &http.Client{
+		Jar: jar,
+	}
+
+	// Login payload
+	loginPayload := map[string]string{
+		"login":    username,
+		"password": password,
+	}
+	payloadBytes, err := json.Marshal(loginPayload)
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal login payload: %w", err)
+	}
+
+	// Perform login request
+	loginURL := fmt.Sprintf("%s/auth/login", strings.TrimRight(baseURL, "/"))
+	req, err := http.NewRequest("POST", loginURL, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return false, fmt.Errorf("failed to create login request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	// Skip TLS verification
+	client.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("login request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return false, fmt.Errorf("login failed: %s", string(body))
+	}
+
+	// Fetch accepted list
+	acceptedListURL := fmt.Sprintf("%s/saltkey/acceptedList", strings.TrimRight(baseURL, "/"))
+	req, err = http.NewRequest("GET", acceptedListURL, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to create acceptedList request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err = client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("acceptedList request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return false, fmt.Errorf("failed to fetch acceptedList: %s", string(body))
+	}
+
+	// Parse the result
+	var result struct {
+		Success bool     `json:"success"`
+		Result  []string `json:"result"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return false, fmt.Errorf("failed to parse acceptedList response: %w", err)
+	}
+
+	// Check if the server is in the list
+	for _, s := range result.Result {
+		if s == serverName {
+			return true, nil
+		}
+	}
+	return false, nil
 }

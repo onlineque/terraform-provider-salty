@@ -30,13 +30,19 @@ func New(version string) func() provider.Provider {
 }
 
 type providerData struct {
-	Username   string
-	PrivateKey string
+	Username      string
+	PrivateKey    string
+	UyuniBaseURL  string
+	UyuniUsername string
+	UyuniPassword string
 }
 
 type saltyProviderModel struct {
-	Username   types.String `tfsdk:"username"`
-	PrivateKey types.String `tfsdk:"private_key"`
+	Username      types.String `tfsdk:"username"`
+	PrivateKey    types.String `tfsdk:"private_key"`
+	UyuniBaseURL  types.String `tfsdk:"uyuni_base_url"`
+	UyuniUsername types.String `tfsdk:"uyuni_username"`
+	UyuniPassword types.String `tfsdk:"uyuni_password"`
 }
 
 // saltyProvider is the provider implementation.
@@ -61,6 +67,16 @@ func (p *saltyProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp
 				Required: true,
 			},
 			"private_key": schema.StringAttribute{
+				Sensitive: true,
+				Required:  true,
+			},
+			"uyuni_base_url": schema.StringAttribute{
+				Required: true,
+			},
+			"uyuni_username": schema.StringAttribute{
+				Required: true,
+			},
+			"uyuni_password": schema.StringAttribute{
 				Sensitive: true,
 				Required:  true,
 			},
@@ -105,13 +121,40 @@ func (p *saltyProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		)
 	}
 
+	if config.UyuniBaseURL.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("uyuni_base_url"),
+			"Unknown Uyuni base URL for connecting to Uyuni server",
+			"The provider cannot create the Salty client as there is an unknown configuration value for the Salty Uyuni base URL. ",
+		)
+	}
+
+	if config.UyuniUsername.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("uyuni_username"),
+			"Unknown Uyuni username for connecting to Uyuni server",
+			"The provider cannot create the Salty client as there is an unknown configuration value for the Salty Uyuni username. ",
+		)
+	}
+
+	if config.UyuniPassword.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("uyuni_password"),
+			"Unknown Uyuni password for connecting to Uyuni server",
+			"The provider cannot create the Salty client as there is an unknown configuration value for the Salty Uyuni password. ",
+		)
+	}
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	data := &providerData{
-		Username:   config.Username.ValueString(),
-		PrivateKey: config.PrivateKey.ValueString(),
+		Username:      config.Username.ValueString(),
+		PrivateKey:    config.PrivateKey.ValueString(),
+		UyuniBaseURL:  config.UyuniBaseURL.ValueString(),
+		UyuniUsername: config.UyuniUsername.ValueString(),
+		UyuniPassword: config.UyuniPassword.ValueString(),
 	}
 	resp.ResourceData = data
 	resp.DataSourceData = data
