@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"golang.org/x/crypto/ssh"
+	"time"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -25,8 +26,11 @@ func NewGrainStringResource() resource.Resource {
 
 // GrainResource defines the resource implementation.
 type GrainStringResource struct {
-	username   *string
-	privateKey *string
+	username      *string
+	privateKey    *string
+	uyuniBaseURL  *string
+	uyuniUsername *string
+	uyuniPassword *string
 }
 
 // GrainResourceModel describes the resource data model.
@@ -91,6 +95,9 @@ func (r *GrainStringResource) Configure(ctx context.Context, req resource.Config
 
 	r.username = &data.Username
 	r.privateKey = &data.PrivateKey
+	r.uyuniBaseURL = &data.UyuniBaseURL
+	r.uyuniUsername = &data.UyuniUsername
+	r.uyuniPassword = &data.UyuniPassword
 }
 
 func (r *GrainStringResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -103,8 +110,17 @@ func (r *GrainStringResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
+	err := r.waitMinionIsUp(ctx, data)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"failed to wait for the minion to be up",
+			fmt.Sprintf("failed to wait for the minion %s to be up: %s", data.Server.ValueString(), err),
+		)
+		return
+	}
+
 	runCommand := fmt.Sprintf("/usr/lib/venv-salt-minion/bin/salt-call grains.setval %s %s", data.GrainKey.String(), data.GrainValue.String())
-	_, err := r.runRemoteCommand(runCommand, ctx, data)
+	_, err = r.runRemoteCommand(runCommand, ctx, data)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Cannot create the grain value on the Salt Minion",
@@ -149,6 +165,15 @@ func (r *GrainStringResource) Read(ctx context.Context, req resource.ReadRequest
 	resp.Diagnostics.Append(diags...)
 
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	err := r.waitMinionIsUp(ctx, data)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"failed to wait for the minion to be up",
+			fmt.Sprintf("failed to wait for the minion %s to be up: %s", data.Server.ValueString(), err),
+		)
 		return
 	}
 
@@ -200,6 +225,15 @@ func (r *GrainStringResource) Update(ctx context.Context, req resource.UpdateReq
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	err := r.waitMinionIsUp(ctx, data)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"failed to wait for the minion to be up",
+			fmt.Sprintf("failed to wait for the minion %s to be up: %s", data.Server.ValueString(), err),
+		)
 		return
 	}
 
@@ -255,8 +289,17 @@ func (r *GrainStringResource) Delete(ctx context.Context, req resource.DeleteReq
 	tflog.Info(ctx, data.GrainKey.String())
 	tflog.Info(ctx, data.GrainValue.String())
 
+	err := r.waitMinionIsUp(ctx, data)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"failed to wait for the minion to be up",
+			fmt.Sprintf("failed to wait for the minion %s to be up: %s", data.Server.ValueString(), err),
+		)
+		return
+	}
+
 	runCommand := fmt.Sprintf("/usr/lib/venv-salt-minion/bin/salt-call grains.delkey %s --out=json", data.GrainKey.String())
-	_, err := r.runRemoteCommand(runCommand, ctx, data)
+	_, err = r.runRemoteCommand(runCommand, ctx, data)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			err.Error(),
@@ -324,4 +367,29 @@ func (r *GrainStringResource) runRemoteCommand(runCommand string, ctx context.Co
 	}
 
 	return string(cmdOutput), nil
+}
+
+func (r *GrainStringResource) waitMinionIsUp(ctx context.Context, data GrainStringResourceModel) error {
+	timeout := 30 * time.Minute
+	deadline := time.Now().Add(timeout)
+
+	tflog.Info(ctx, "starting to wait for the minion to be up")
+
+	for {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout reached after %d minutes; salt-key for %s not accepted", timeout, data.Server.ValueString())
+		}
+
+		found, err := CheckServerAccepted(*r.uyuniBaseURL, *r.uyuniUsername, *r.uyuniPassword, data.Server.ValueString())
+		if err != nil {
+			return fmt.Errorf("error checking salt-key acceptance of %s: %s", data.Server.ValueString(), err)
+		}
+
+		tflog.Info(ctx, fmt.Sprintf("called checkServerAccepted with result: %v, error: %s", found, err))
+
+		if found {
+			return nil
+		}
+		time.Sleep(10 * time.Second)
+	}
 }

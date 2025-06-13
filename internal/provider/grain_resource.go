@@ -118,7 +118,7 @@ func (r *GrainResource) Create(ctx context.Context, req resource.CreateRequest, 
 		return
 	}
 
-	err := r.waitMinionIsUp(data)
+	err := r.waitMinionIsUp(ctx, data)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"failed to wait for the minion to be up",
@@ -180,7 +180,7 @@ func (r *GrainResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	err := r.waitMinionIsUp(data)
+	err := r.waitMinionIsUp(ctx, data)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"failed to wait for the minion to be up",
@@ -252,7 +252,7 @@ func (r *GrainResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	err := r.waitMinionIsUp(data)
+	err := r.waitMinionIsUp(ctx, data)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"failed to wait for the minion to be up",
@@ -418,7 +418,7 @@ func (r *GrainResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		return
 	}
 
-	err := r.waitMinionIsUp(data)
+	err := r.waitMinionIsUp(ctx, data)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"failed to wait for the minion to be up",
@@ -473,9 +473,11 @@ func (r *GrainResource) applyState(ctx context.Context, data GrainResourceModel)
 	return nil
 }
 
-func (r *GrainResource) waitMinionIsUp(data GrainResourceModel) error {
+func (r *GrainResource) waitMinionIsUp(ctx context.Context, data GrainResourceModel) error {
 	timeout := 30 * time.Minute
 	deadline := time.Now().Add(timeout)
+
+	tflog.Info(ctx, "starting to wait for the minion to be up")
 
 	for {
 		if time.Now().After(deadline) {
@@ -486,6 +488,9 @@ func (r *GrainResource) waitMinionIsUp(data GrainResourceModel) error {
 		if err != nil {
 			return fmt.Errorf("error checking salt-key acceptance of %s: %s", data.Server.ValueString(), err)
 		}
+
+		tflog.Info(ctx, fmt.Sprintf("called checkServerAccepted with result: %v, error: %s", found, err))
+
 		if found {
 			return nil
 		}
