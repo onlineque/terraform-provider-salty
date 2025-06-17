@@ -146,10 +146,10 @@ func (r *GrainStringResource) Create(ctx context.Context, req resource.CreateReq
 				err.Error(),
 				err.Error())
 		}
+		resp.Diagnostics.AddWarning("state apply result", applyResult)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		resp.Diagnostics.AddWarning("state apply result", applyResult)
 	}
 
 	// Save data into Terraform state
@@ -259,10 +259,11 @@ func (r *GrainStringResource) Update(ctx context.Context, req resource.UpdateReq
 				err.Error(),
 				err.Error())
 		}
+		resp.Diagnostics.AddWarning("apply state result", applyResult)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		resp.Diagnostics.AddWarning("apply state result", applyResult)
+
 	}
 
 	data.Id = types.StringValue(fmt.Sprintf("%s-%s", data.Server.ValueString(), data.GrainKey.ValueString()))
@@ -316,10 +317,11 @@ func (r *GrainStringResource) Delete(ctx context.Context, req resource.DeleteReq
 				err.Error(),
 				err.Error())
 		}
+		resp.Diagnostics.AddWarning("apply state result", applyResult)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		resp.Diagnostics.AddWarning("apply state result", applyResult)
+
 	}
 }
 

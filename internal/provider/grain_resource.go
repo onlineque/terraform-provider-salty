@@ -152,12 +152,13 @@ func (r *GrainResource) Create(ctx context.Context, req resource.CreateRequest, 
 	tflog.Info(ctx, string(b))
 
 	if data.ApplyState.ValueBool() {
-		err := r.applyState(ctx, data)
+		applyStateResult, err := r.applyState(ctx, data)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				err.Error(),
 				err.Error())
 		}
+		resp.Diagnostics.AddWarning("apply state result", applyStateResult)
 		if resp.Diagnostics.HasError() {
 			return
 		}
@@ -387,12 +388,13 @@ func (r *GrainResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 
 	if data.ApplyState.ValueBool() {
-		err = r.applyState(ctx, data)
+		applyStateResult, err := r.applyState(ctx, data)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				err.Error(),
 				err.Error())
 		}
+		resp.Diagnostics.AddWarning("apply state result", applyStateResult)
 		if resp.Diagnostics.HasError() {
 			return
 		}
@@ -447,12 +449,13 @@ func (r *GrainResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	}
 
 	if data.ApplyState.ValueBool() {
-		err := r.applyState(ctx, data)
+		applyStateResult, err := r.applyState(ctx, data)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				err.Error(),
 				err.Error())
 		}
+		resp.Diagnostics.AddWarning("apply state result", applyStateResult)
 		if resp.Diagnostics.HasError() {
 			return
 		}
@@ -463,14 +466,14 @@ func (r *GrainResource) ImportState(ctx context.Context, req resource.ImportStat
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func (r *GrainResource) applyState(ctx context.Context, data GrainResourceModel) error {
+func (r *GrainResource) applyState(ctx context.Context, data GrainResourceModel) (string, error) {
 	runCommand := "/usr/lib/venv-salt-minion/bin/salt-call state.apply"
-	_, err := r.runRemoteCommand(runCommand, ctx, data)
+	applyStateResult, err := r.runRemoteCommand(runCommand, ctx, data)
 	if err != nil {
-		return fmt.Errorf("cannot apply state: %s", err.Error())
+		return applyStateResult, fmt.Errorf("cannot apply state: %s", err.Error())
 	}
 
-	return nil
+	return applyStateResult, nil
 }
 
 func (r *GrainResource) waitMinionIsUp(ctx context.Context, data GrainResourceModel) error {
