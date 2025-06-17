@@ -140,7 +140,7 @@ func (r *GrainStringResource) Create(ctx context.Context, req resource.CreateReq
 	tflog.Info(ctx, string(b))
 
 	if data.ApplyState.ValueBool() {
-		err := r.applyState(ctx, data)
+		applyResult, err := r.applyState(ctx, data)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				err.Error(),
@@ -149,6 +149,7 @@ func (r *GrainStringResource) Create(ctx context.Context, req resource.CreateReq
 		if resp.Diagnostics.HasError() {
 			return
 		}
+		resp.Diagnostics.AddWarning("state apply result", applyResult)
 	}
 
 	// Save data into Terraform state
@@ -252,7 +253,7 @@ func (r *GrainStringResource) Update(ctx context.Context, req resource.UpdateReq
 	}
 
 	if data.ApplyState.ValueBool() {
-		err = r.applyState(ctx, data)
+		applyResult, err := r.applyState(ctx, data)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				err.Error(),
@@ -261,6 +262,7 @@ func (r *GrainStringResource) Update(ctx context.Context, req resource.UpdateReq
 		if resp.Diagnostics.HasError() {
 			return
 		}
+		resp.Diagnostics.AddWarning("apply state result", applyResult)
 	}
 
 	data.Id = types.StringValue(fmt.Sprintf("%s-%s", data.Server.ValueString(), data.GrainKey.ValueString()))
@@ -308,7 +310,7 @@ func (r *GrainStringResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	if data.ApplyState.ValueBool() {
-		err := r.applyState(ctx, data)
+		applyResult, err := r.applyState(ctx, data)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				err.Error(),
@@ -317,6 +319,7 @@ func (r *GrainStringResource) Delete(ctx context.Context, req resource.DeleteReq
 		if resp.Diagnostics.HasError() {
 			return
 		}
+		resp.Diagnostics.AddWarning("apply state result", applyResult)
 	}
 }
 
@@ -324,14 +327,14 @@ func (r *GrainStringResource) ImportState(ctx context.Context, req resource.Impo
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func (r *GrainStringResource) applyState(ctx context.Context, data GrainStringResourceModel) error {
+func (r *GrainStringResource) applyState(ctx context.Context, data GrainStringResourceModel) (string, error) {
 	runCommand := "/usr/lib/venv-salt-minion/bin/salt-call state.apply"
-	_, err := r.runRemoteCommand(runCommand, ctx, data)
+	applyStateResult, err := r.runRemoteCommand(runCommand, ctx, data)
 	if err != nil {
-		return fmt.Errorf("cannot apply state: %s", err.Error())
+		return "", fmt.Errorf("cannot apply state: %s", err.Error())
 	}
 
-	return nil
+	return applyStateResult, nil
 }
 
 func (r *GrainStringResource) runRemoteCommand(runCommand string, ctx context.Context, data GrainStringResourceModel) (string, error) {
