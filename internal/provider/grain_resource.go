@@ -467,7 +467,7 @@ func (r *GrainResource) ImportState(ctx context.Context, req resource.ImportStat
 }
 
 func (r *GrainResource) applyState(ctx context.Context, data GrainResourceModel) (string, error) {
-	runCommand := "/usr/lib/venv-salt-minion/bin/salt-call state.apply"
+	runCommand := "/usr/lib/venv-salt-minion/bin/salt-call state.apply >> /var/log/state.apply.tf.log 2>&1"
 	applyStateResult, err := r.runRemoteCommand(runCommand, ctx, data)
 	if err != nil {
 		return applyStateResult, fmt.Errorf("cannot apply state: %s", err.Error())
